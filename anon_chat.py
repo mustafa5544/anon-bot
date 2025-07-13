@@ -126,8 +126,14 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 # Main bot application setup
 async def main():
     print("🔧 Setting up bot application...")
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-
+    
+    # Create bot directly without ApplicationBuilder
+    from telegram import Bot
+    from telegram.ext import Application
+    
+    bot = Bot(token=BOT_TOKEN)
+    app = Application(bot=bot)
+    
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("search", search))
     app.add_handler(CommandHandler("next", next_chat))
