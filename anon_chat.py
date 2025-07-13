@@ -1,7 +1,12 @@
 import os
-from aiogram import Bot, Dispatcher, types
-from aiogram.contrib.fsm_storage.memory import MemoryStorage
-import asyncio
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
 print("✅ Bot is starting...")
 
@@ -18,52 +23,44 @@ active_chats = {}
 user_gender = {}
 user_pref_gender = {}
 
-# Initialize bot and dispatcher
-bot = Bot(token=BOT_TOKEN)
-storage = MemoryStorage()
-dp = Dispatcher(bot, storage=storage)
-
 # Handle /start command
-@dp.message_handler(commands=['start'])
-async def start(message: types.Message):
-    user_id = message.from_user.id
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     user_gender[user_id] = "ask"
-    await message.reply("Welcome to Anonymous Chat!\nWhat is your gender? (Male/Female/Other)")
+    await update.message.reply_text("Welcome to Anonymous Chat!\nWhat is your gender? (Male/Female/Other)")
 
 # Handle plain text messages
-@dp.message_handler(content_types=['text'])
-async def handle_message(message: types.Message):
-    user_id = message.from_user.id
-    text = message.text.lower()
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    text = update.message.text.lower()
 
     if user_id in user_gender and user_gender[user_id] == "ask":
         if text in ["male", "female", "other"]:
             user_gender[user_id] = text
             user_pref_gender[user_id] = "ask"
-            await message.reply("Who do you want to chat with? (Male/Female/Any)")
+            await update.message.reply_text("Who do you want to chat with? (Male/Female/Any)")
         else:
-            await message.reply("Please choose: Male, Female or Other")
+            await update.message.reply_text("Please choose: Male, Female or Other")
         return
 
     if user_id in user_pref_gender and user_pref_gender[user_id] == "ask":
         if text in ["male", "female", "any"]:
             user_pref_gender[user_id] = text
-            await message.reply("Done! Use /search to find a chat partner.")
+            await update.message.reply_text("Done! Use /search to find a chat partner.")
         else:
-            await message.reply("Please choose: Male, Female, or Any.")
+            await update.message.reply_text("Please choose: Male, Female, or Any.")
         return
 
     if user_id in active_chats:
         partner_id = active_chats[user_id]
         if partner_id:
-            await bot.send_message(chat_id=partner_id, text=message.text)
+            await context.bot.send_message(chat_id=partner_id, text=update.message.text)
 
 # Handle /search command
-@dp.message_handler(commands=['search'])
-async def search(message: types.Message):
-    user_id = message.from_user.id
+async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     if user_id in active_chats:
-        await message.reply("You're already chatting. Use /next to skip.")
+        await update.message.reply_text("You're already chatting. Use /next to skip.")
         return
 
     my_gender = user_gender.get(user_id)
@@ -78,29 +75,27 @@ async def search(message: types.Message):
             active_chats[user_id] = partner_id
             active_chats[partner_id] = user_id
 
-            await bot.send_message(chat_id=user_id, text="Connected! Say hi!")
-            await bot.send_message(chat_id=partner_id, text="Connected! Say hi!")
+            await context.bot.send_message(chat_id=user_id, text="Connected! Say hi!")
+            await context.bot.send_message(chat_id=partner_id, text="Connected! Say hi!")
             return
 
     waiting_users.append(user_id)
-    await message.reply("Waiting for a partner...")
+    await update.message.reply_text("Waiting for a partner...")
 
 # Handle /next command
-@dp.message_handler(commands=['next'])
-async def next_chat(message: types.Message):
-    user_id = message.from_user.id
+async def next_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     partner_id = active_chats.pop(user_id, None)
 
     if partner_id:
         active_chats.pop(partner_id, None)
-        await bot.send_message(chat_id=partner_id, text="Your partner left. Use /search to find someone new.")
+        await context.bot.send_message(chat_id=partner_id, text="Your partner left. Use /search to find someone new.")
 
-    await search(message)
+    await search(update, context)
 
 # Handle /stop command
-@dp.message_handler(commands=['stop'])
-async def stop_chat(message: types.Message):
-    user_id = message.from_user.id
+async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
     if user_id in waiting_users:
         waiting_users.remove(user_id)
 
@@ -108,18 +103,28 @@ async def stop_chat(message: types.Message):
         partner_id = active_chats.pop(user_id, None)
         if partner_id:
             active_chats.pop(partner_id, None)
-            await bot.send_message(chat_id=partner_id, text="Your partner left the chat.")
+            await context.bot.send_message(chat_id=partner_id, text="Your partner left the chat.")
 
-    await message.reply("You left the chat. Use /search to find someone else.")
+    await update.message.reply_text("You left the chat. Use /search to find someone else.")
 
-# Main function
+# Main bot application setup
 async def main():
     print("🔧 Setting up bot application...")
-    print("🚀 Bot is polling...")
     
-    # Start polling
-    await dp.start_polling(skip_updates=True)
+    # Create the application with minimal configuration
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("search", search))
+    app.add_handler(CommandHandler("next", next_chat))
+    app.add_handler(CommandHandler("stop", stop_chat))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    print("🚀 Bot is polling...")
+    # Start the Bot with a simple approach
+    await app.run_polling(drop_pending_updates=True)
 
 # Run bot
 if __name__ == "__main__":
+    import asyncio
     asyncio.run(main())
