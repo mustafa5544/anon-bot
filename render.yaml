@@ -2,7 +2,7 @@ services:
   - type: worker
     name: anon-bot
     env: python
-    pythonVersion: "3.11"
+    pythonVersion: "3.11.18"
     buildCommand: "pip install -r requirements.txt"
     startCommand: "python anon_chat.py"
     envVars:
