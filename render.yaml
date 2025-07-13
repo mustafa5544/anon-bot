@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: anon-bot
+    env: python
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "python anon_chat.py"
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
