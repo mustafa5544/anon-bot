@@ -1,7 +1,12 @@
 import os
-import asyncio
-from telegram import Bot, Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram import Update
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
 
 print("✅ Bot is starting...")
 
@@ -106,9 +111,8 @@ async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def main():
     print("🔧 Setting up bot application...")
     
-    # Create bot and application directly
-    bot = Bot(token=BOT_TOKEN)
-    app = Application.builder().bot(bot).build()
+    # Create the application
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("search", search))
@@ -117,23 +121,10 @@ async def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("🚀 Bot is polling...")
-    
-    # Start the bot with manual control
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
-    
-    # Keep the bot running
-    try:
-        while True:
-            await asyncio.sleep(1)
-    except KeyboardInterrupt:
-        print("⏹️ Stopping bot...")
-    finally:
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
+    # Start the Bot
+    await app.run_polling(drop_pending_updates=True)
 
 # Run bot
 if __name__ == "__main__":
+    import asyncio
     asyncio.run(main())
