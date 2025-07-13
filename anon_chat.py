@@ -125,6 +125,7 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
 # Main bot application setup
 async def main():
+    print("🔧 Setting up bot application...")
     app = ApplicationBuilder().token(BOT_TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
@@ -137,28 +138,20 @@ async def main():
     app.add_error_handler(error_handler)
 
     print("🚀 Bot is polling...")
-    await app.initialize()
-    await app.start()
-    await app.updater.start_polling(drop_pending_updates=True)
-    
-    # Keep the bot running
-    try:
-        await asyncio.Event().wait()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        await app.updater.stop()
-        await app.stop()
-        await app.shutdown()
+    await app.run_polling(drop_pending_updates=True)
 
 # Run bot
 if __name__ == "__main__":
+    print("🔄 Starting bot...")
     try:
         import asyncio
+        print("📦 Imported asyncio successfully")
         asyncio.run(main())
     except KeyboardInterrupt:
-        print("Bot stopped by user")
+        print("⏹️ Bot stopped by user")
     except Exception as e:
-        print(f"Bot error: {e}")
+        print(f"❌ Bot error: {e}")
+        import traceback
+        traceback.print_exc()
         import sys
         sys.exit(1)
