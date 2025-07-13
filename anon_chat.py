@@ -1,19 +1,37 @@
 import os
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ContextTypes,
+    filters,
+)
+from telegram.error import Conflict, NetworkError, TimedOut
+import asyncio
 
+print("✅ Bot is starting...")
+
+# Get the bot token from environment variable
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+if not BOT_TOKEN:
+    print("❌ BOT_TOKEN is missing!")
+    exit(1)
+
+# Global state
 waiting_users = []
 active_chats = {}
 user_gender = {}
 user_pref_gender = {}
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-
+# Handle /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_gender[user_id] = "ask"
     await update.message.reply_text("Welcome to Anonymous Chat!\nWhat is your gender? (Male/Female/Other)")
 
+# Handle plain text messages
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.lower()
@@ -40,6 +58,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if partner_id:
             await context.bot.send_message(chat_id=partner_id, text=update.message.text)
 
+# Handle /search command
 async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in active_chats:
@@ -65,6 +84,7 @@ async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     waiting_users.append(user_id)
     await update.message.reply_text("Waiting for a partner...")
 
+# Handle /next command
 async def next_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     partner_id = active_chats.pop(user_id, None)
@@ -75,6 +95,7 @@ async def next_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await search(update, context)
 
+# Handle /stop command
 async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     if user_id in waiting_users:
@@ -88,12 +109,37 @@ async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text("You left the chat. Use /search to find someone else.")
 
-app = ApplicationBuilder().token(BOT_TOKEN).build()
+# Error handler
+async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Log Errors caused by Updates."""
+    if isinstance(context.error, Conflict):
+        print(f"⚠️ Bot conflict detected: {context.error}")
+        # Wait a bit and try to restart
+        await asyncio.sleep(5)
+        return
+    elif isinstance(context.error, (NetworkError, TimedOut)):
+        print(f"⚠️ Network error: {context.error}")
+        return
+    else:
+        print(f"❌ Update {update} caused error {context.error}")
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("search", search))
-app.add_handler(CommandHandler("next", next_chat))
-app.add_handler(CommandHandler("stop", stop_chat))
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+# Main bot application setup
+async def main():
+    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-app.run_polling()
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("search", search))
+    app.add_handler(CommandHandler("next", next_chat))
+    app.add_handler(CommandHandler("stop", stop_chat))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # Add error handler
+    app.add_error_handler(error_handler)
+
+    print("🚀 Bot is polling...")
+    await app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+
+# Run bot
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
