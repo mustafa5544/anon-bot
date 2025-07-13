@@ -1,7 +1,6 @@
 import os
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.contrib.fsm_storage.memory import MemoryStorage
 import asyncio
 
 print("✅ Bot is starting...")
@@ -21,18 +20,19 @@ user_pref_gender = {}
 
 # Initialize bot and dispatcher
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+storage = MemoryStorage()
+dp = Dispatcher(bot, storage=storage)
 
 # Handle /start command
-@dp.message(Command("start"))
-async def start(message: Message):
+@dp.message_handler(commands=['start'])
+async def start(message: types.Message):
     user_id = message.from_user.id
     user_gender[user_id] = "ask"
     await message.reply("Welcome to Anonymous Chat!\nWhat is your gender? (Male/Female/Other)")
 
 # Handle plain text messages
-@dp.message()
-async def handle_message(message: Message):
+@dp.message_handler(content_types=['text'])
+async def handle_message(message: types.Message):
     user_id = message.from_user.id
     text = message.text.lower()
 
@@ -59,8 +59,8 @@ async def handle_message(message: Message):
             await bot.send_message(chat_id=partner_id, text=message.text)
 
 # Handle /search command
-@dp.message(Command("search"))
-async def search(message: Message):
+@dp.message_handler(commands=['search'])
+async def search(message: types.Message):
     user_id = message.from_user.id
     if user_id in active_chats:
         await message.reply("You're already chatting. Use /next to skip.")
@@ -86,8 +86,8 @@ async def search(message: Message):
     await message.reply("Waiting for a partner...")
 
 # Handle /next command
-@dp.message(Command("next"))
-async def next_chat(message: Message):
+@dp.message_handler(commands=['next'])
+async def next_chat(message: types.Message):
     user_id = message.from_user.id
     partner_id = active_chats.pop(user_id, None)
 
@@ -98,8 +98,8 @@ async def next_chat(message: Message):
     await search(message)
 
 # Handle /stop command
-@dp.message(Command("stop"))
-async def stop_chat(message: Message):
+@dp.message_handler(commands=['stop'])
+async def stop_chat(message: types.Message):
     user_id = message.from_user.id
     if user_id in waiting_users:
         waiting_users.remove(user_id)
@@ -118,7 +118,7 @@ async def main():
     print("🚀 Bot is polling...")
     
     # Start polling
-    await dp.start_polling(bot, skip_updates=True)
+    await dp.start_polling(skip_updates=True)
 
 # Run bot
 if __name__ == "__main__":
