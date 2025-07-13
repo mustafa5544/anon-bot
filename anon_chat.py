@@ -137,9 +137,28 @@ async def main():
     app.add_error_handler(error_handler)
 
     print("🚀 Bot is polling...")
-    await app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling(drop_pending_updates=True)
+    
+    # Keep the bot running
+    try:
+        await asyncio.Event().wait()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        await app.updater.stop()
+        await app.stop()
+        await app.shutdown()
 
 # Run bot
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    try:
+        import asyncio
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped by user")
+    except Exception as e:
+        print(f"Bot error: {e}")
+        import sys
+        sys.exit(1)
