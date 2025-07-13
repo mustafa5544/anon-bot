@@ -17,40 +17,18 @@ if not BOT_TOKEN:
     print("❌ BOT_TOKEN is missing!")
     exit(1)
 
-# Global state
+# Global state - simplified
 waiting_users = []
 active_chats = {}
-user_gender = {}
-user_pref_gender = {}
 
 # Handle /start command
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    user_gender[user_id] = "ask"
-    await update.message.reply_text("Welcome to Anonymous Chat!\nWhat is your gender? (Male/Female/Other)")
+    await update.message.reply_text("Welcome to Anonymous Chat!\nUse /search to find a chat partner.")
 
 # Handle plain text messages
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
-    text = update.message.text.lower()
-
-    if user_id in user_gender and user_gender[user_id] == "ask":
-        if text in ["male", "female", "other"]:
-            user_gender[user_id] = text
-            user_pref_gender[user_id] = "ask"
-            await update.message.reply_text("Who do you want to chat with? (Male/Female/Any)")
-        else:
-            await update.message.reply_text("Please choose: Male, Female or Other")
-        return
-
-    if user_id in user_pref_gender and user_pref_gender[user_id] == "ask":
-        if text in ["male", "female", "any"]:
-            user_pref_gender[user_id] = text
-            await update.message.reply_text("Done! Use /search to find a chat partner.")
-        else:
-            await update.message.reply_text("Please choose: Male, Female, or Any.")
-        return
-
+    
     if user_id in active_chats:
         partner_id = active_chats[user_id]
         if partner_id:
@@ -59,18 +37,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Handle /search command
 async def search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    
     if user_id in active_chats:
         await update.message.reply_text("You're already chatting. Use /next to skip.")
         return
 
-    my_gender = user_gender.get(user_id)
-    my_pref = user_pref_gender.get(user_id)
-
+    # Find a partner
     for partner_id in waiting_users:
-        partner_gender = user_gender.get(partner_id)
-        partner_pref = user_pref_gender.get(partner_id)
-
-        if (my_pref in ["any", partner_gender]) and (partner_pref in ["any", my_gender]):
+        if partner_id != user_id:
             waiting_users.remove(partner_id)
             active_chats[user_id] = partner_id
             active_chats[partner_id] = user_id
@@ -96,6 +70,7 @@ async def next_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Handle /stop command
 async def stop_chat(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
+    
     if user_id in waiting_users:
         waiting_users.remove(user_id)
 
